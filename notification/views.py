@@ -1,10 +1,13 @@
 from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, get_object_or_404
-from django.http import HttpResponseRedirect, Http404
+from django.http import HttpResponseRedirect, Http404, HttpResponseForbidden
 from django.template import RequestContext
 
 from django.contrib.auth.decorators import login_required
-from django.contrib.syndication.views import feed
+try:
+    from django.contrib.syndication.views import feed
+except ImportError:
+    from django.contrib.syndication.views import Feed as feed
 
 from notification.models import *
 from notification.decorators import basic_auth_required, simple_basic_auth_callback
@@ -192,3 +195,17 @@ def mark_all_seen(request):
         notice.unseen = False
         notice.save()
     return HttpResponseRedirect(reverse("notification_notices"))
+
+@login_required
+def ajax_mark_all_seen(request):
+    """
+    Mark all unseen notices for the requesting user as seen.
+    Only works when called through ajax (or during debug).
+    
+    Returns an empty json dict.
+    """
+    if not request.is_ajax() and not DEBUG:
+        return HttpResponseForbidden()
+    
+    Notice.objects.notices_for(request.user, unseen=True).update(unseen=False)
+    return HttpResponse("{}")
